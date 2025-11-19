@@ -42,7 +42,7 @@ def human_move_to(x1, y1, x2, y2, duration=400):
 def expand_loc(x, y):
     return x + random.randint(-30, 30), y + random.randint(-30, 30)
 
-def click(x, y, pause=1):
+def click(x, y, pause=1.0):
     pyautogui.click(x, y)
     time.sleep(pause)
 
@@ -62,7 +62,7 @@ def worth():
         click(*data["next"])
         counter = 0
 
-def point_on_line(x1, y1, x2, y2, t=random.uniform(0, 1)):
+def point_on_line(x1, y1, x2, y2, t=0.5):
     x = x1 + (x2 - x1) * t
     y = y1 + (y2 - y1) * t
     return x, y
@@ -128,7 +128,7 @@ def troop_spam(duration):
 
     heroes()
 
-    time.sleep(random.randint(25, 35))
+    time.sleep(random.randint(10, 20))
 
 
 def sneaky_goblins_helper(corner, direction, iteration, duration):
@@ -148,21 +148,33 @@ def heroes():
         c2 = data["top"][0]
     else:
         c2 = data[random.choice(["left", "right"])][0]
+    hero_point = point_on_line(*c1, *c2, random.uniform(0, 1))
     for i in range(5):
         keyboard.press_and_release(lst[i])
-        time.sleep(0.3)
-        click(*point_on_line(*c1, *c2), random.uniform(0.5, 1))
+        time.sleep(random.uniform(0.5, 1))
+        x, y = hero_point
+        click(x + random.randint(-10, 10), y + random.randint(-10, 10), random.uniform(0.5, 1))
         if i == 4:
             break
         keyboard.press_and_release(lst[i])
-        time.sleep(0.3)
+        time.sleep(random.uniform(0.5, 1))
+    spells(hero_point)
     return
 
+def spells(hero_point):
+    middle = (data["top"][0][0], data["left"][0][1])
+    keyboard.press_and_release('a')
+    time.sleep(random.uniform(0.5, 1))
+    t = random.uniform(0.1, 0.3)
+    for i in range(5):
+        click(*point_on_line(*hero_point, *middle, t), random.uniform(0.5, 1))
+        t = min(1.0, t + random.uniform(0.1, 0.3))
+        time.sleep(random.uniform(3, 5))
 
-
-def attack(_method):
+def attack(_method, run_time):
     time.sleep(3)
-    while True:
+    start_time = time.time()
+    while time.time() - start_time < run_time:
         click(*data["attack"])
         click(*data["find_match"])
         click(*data["attack2"])
@@ -188,20 +200,24 @@ if __name__ == "__main__":
             data = start_setup()
             with open(DATA_FILE, "w") as f:
                 json.dump(data, f, indent=4)
-
         print("[1] Sneaky Goblins")
         print("[2] Super Barbs")
         print("What attack would you like to use? ")
-        key = input("Enter a number: ")
+        key = int(input("Enter a number: "))
 
-        if key == "1":
-            print("Sneaky Goblins chosen! Farming will begin in 5 seconds, minimize this window.")
-            time.sleep(2)
-            attack(1)
-        if key == "2":
-            print("Super Barbs chosen! Farming will begin in 5 seconds, minimize this window.")
-            time.sleep(2)
-            attack(2)
+        if key == 1:
+            print("Sneaky Goblins chosen!")
+        if key == 2:
+            print("Super Barbs chosen!")
+        print("Select how long you want to run Autoloot, in minutes! (max duration 60 minutes): ", end='')
+        max_time = min(60, int(input())) * 60
+        print("Autoloot starting in 5 seconds, minimize this window!")
+        time.sleep(2)
+        attack(key, max_time)
+
+        print("Finished Autoloot.")
+        input("\nPress Enter to exit...")
+
 
     except Exception:
         import traceback
