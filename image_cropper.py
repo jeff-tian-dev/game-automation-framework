@@ -1,42 +1,58 @@
-from PIL import ImageGrab
 import os
+import sys
 import cv2
-from pathlib import Path
 import numpy as np
+from pathlib import Path
+from PIL import ImageGrab
+
+if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+    # Running as PyInstaller onefile EXE
+    BASE_DIR = Path(sys._MEIPASS)
+else:
+    # Running as plain .py
+    BASE_DIR = Path(__file__).resolve().parent
+
+APPDATA = Path(os.getenv("APPDATA")) / "AutoLootBot"
+SCREENS_DIR = APPDATA / "screens"
+SCREENS_DIR.mkdir(parents=True, exist_ok=True)
+
+BLOBS_DIR = APPDATA / "blobs_tmp"
+BLOBS_DIR.mkdir(parents=True, exist_ok=True)
 
 def crop_screen(x1, y1, x2, y2, output_name="cropped_screen.png"):
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    output_path = os.path.join(script_dir, output_name)
+    output_path = SCREENS_DIR / output_name
     try:
         screenshot = ImageGrab.grab()
 
         crop_box = (x1, y1, x2, y2)
         cropped = screenshot.crop(crop_box)
-
         cropped.save(output_path)
-        print(f"Cropped screen saved at: {output_path}")
+
         return output_path
     except Exception as e:
         print(f"Error while capturing screen: {e}")
         return None
 
-def _preprocess(img_bgr, debug_stem=None):
+def _preprocess(img_bgr, debug=None):
     gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
-    _, th = cv2.threshold(gray, 230, 255, cv2.THRESH_BINARY)
+    otsu_val, _ = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    strict_val = otsu_val + 75
+    _, th = cv2.threshold(gray, strict_val, 255, cv2.THRESH_BINARY)
 
-            # Dilation to connect anti-aliased edges
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2,2))
     th = cv2.dilate(th, kernel, iterations=1)
 
     # Save debug
-    if debug_stem:
-        cv2.imwrite(f"{debug_stem}_gray.png", gray)
-        cv2.imwrite(f"{debug_stem}_bin.png", th)
+    if debug:
+        cv2.imwrite(f"{debug}_gray.png", gray)
+        cv2.imwrite(f"{debug}_bin.png", th)
 
     return th
 
 def find_digit_boxes(bin_img, out_dir="blobs"):
     """Return bounding boxes (x, y, w, h) for each digit-like blob."""
+    out_dir = BLOBS_DIR  # ignore any custom string dirs
+
     os.makedirs(out_dir, exist_ok=True)
 
     # Find connected white components
@@ -74,10 +90,10 @@ THRESH_VAL = 200  # same idea as your _preprocess threshold
 
 def load_templates_binary(template_dir="templates"):
     templates = {}
-    shapes = set()
+    tdir = BASE_DIR / template_dir
 
     for d in range(10):
-        path = Path(template_dir) / f"{d}.png"
+        path = tdir / f"{d}.png"
         img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
         if img is None:
             raise FileNotFoundError(f"Template missing: {path}")
@@ -133,18 +149,17 @@ def classify_digit_by_templates(blob_img, templates, min_score=0.7):
         return None, best_score
     return best_digit, best_score
 
-def read_number_with_templates(img_path, templates, debug=False):
-    """
-    img_path: path to gold/elixir/dark_elixir image
-    templates: dict from load_templates_binary()
-    Returns: int or None
-    """
-    img = cv2.imread(img_path)
+def read_number_with_templates(img_name, templates, debug=False):
+    for f in BLOBS_DIR.glob("*.png"):
+        f.unlink(missing_ok=True)
+
+    img_path = SCREENS_DIR / img_name
+    img = cv2.imread(str(img_path))
     if img is None:
         raise FileNotFoundError(img_path)
 
     # 1) binarize (your function)
-    bin_img = _preprocess(img, debug_stem=Path(img_path).stem if debug else None)
+    bin_img = _preprocess(img, debug=Path(img_path).stem if debug else None)
 
     # 2) find digit blobs (your function)
     boxes = find_digit_boxes(bin_img, out_dir="blobs_debug" if debug else "blobs_tmp")
