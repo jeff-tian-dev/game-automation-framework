@@ -4,7 +4,10 @@ import pyautogui
 import time
 import random
 import json
-import keyboard
+from click_injector import click_inject, human_move_inject
+from click_injector import find_icon_inject
+from click_injector import scroll_inject
+from click_injector import mouse_downup_inject
 
 def resource_path(relative_path):
     try:
@@ -13,20 +16,8 @@ def resource_path(relative_path):
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
-pyautogui.PAUSE = 0
 CORNER_ORDER = ["left", "top", "right", "bottom"]
 data = {}
-
-def find_icon(name, path, confidence=0.8):
-    try:
-        box = pyautogui.locateOnScreen(
-            resource_path(data[path]),
-            confidence=confidence,
-            region=data[name]
-        )
-    except pyautogui.ImageNotFoundException:
-        return False
-    return box is not None
 
 def corner_helper(current, direction):
     idx = CORNER_ORDER.index(current)
@@ -36,73 +27,52 @@ def corner_helper(current, direction):
         return CORNER_ORDER[(idx - 1) % len(CORNER_ORDER)]
     return None
 
-def human_move_to(x1, y1, x2, y2, duration=400):
-    flip = random.randint(250, 500)
-    meth = random.randint(0, 1)
-    if meth == 1:
-        tim = 0.01
-    else:
-        tim = 0.001
-    cx = (x1 + x2) / 2 + random.randint(-30, 30)
-    cy = (y1 + y2) / 2 + random.randint(-30, 30)
-    steps = duration
-    for i in range(steps + 1):
-        t = i / steps
-        x = (1 - t)**2 * x1 + 2 * (1 - t) * t * cx + t**2 * x2
-        y = (1 - t)**2 * y1 + 2 * (1 - t) * t * cy + t**2 * y2
-        pyautogui.moveTo(x, y)
-        time.sleep(max(0, tim))
-        if (i < flip and meth) or (i > flip and not meth):
-            tim /= 1.005
-        else:
-            tim /= 0.995
-
 def expand_loc(x, y):
-    return x + random.randint(-30, 30), y + random.randint(-30, 30)
+    return x + random.randint(-15, 15), y + random.randint(-15, 15)
 
 def click(x, y, pause=1.0):
-    pyautogui.click(x + random.randint(-20, 20), y + random.randint(-20, 20))
+    click_inject(x + random.randint(-20, 20), y + random.randint(-20, 20))
     time.sleep(random.uniform(pause - (pause*0.2), pause + (pause*0.2)))
 
 def worth():
-    while not find_icon("find_icon", "path_find"):
+    while not find_icon_inject(data["path_find"], data["find_icon"],):
         time.sleep(1)
 
 def point_on_line(x1, y1, x2, y2, t=0.5):
     x = x1 + (x2 - x1) * t
     y = y1 + (y2 - y1) * t
-    return x, y
+    return round(x), round(y)
 
 def troop_spam(duration):
     time.sleep(random.randint(1, 2))
     corner = ["right", "left"]
     starting_corner = random.choice(corner)
 
-    keyboard.press_and_release('1')
+    click(*data['1'], 0.1)
     time.sleep(0.2)
-    pyautogui.moveTo(expand_loc(*data[starting_corner]))
-    pyautogui.mouseDown()
-    time.sleep(0.7)
-
-    troop_spam_helper(starting_corner, random.randint(1, 2), 0, duration)
-    pyautogui.mouseUp()
+    try:
+        mouse_downup_inject(1, *expand_loc(*data[starting_corner]))
+        time.sleep(0.7)
+        troop_spam_helper(starting_corner, random.randint(1, 2), 0, duration)
+    finally:
+        mouse_downup_inject(0, *expand_loc(*data[starting_corner]))
 
     heroes()
     spells()
 
     for i in range(random.randint(25, 30)):
-        if find_icon("star_icon", "path_star", 0.8):
+        if find_icon_inject(data["path_star"], data["star_icon"]):
             break
         time.sleep(1)
 
 def troop_spam_helper(corner, direction, iteration, duration):
     if iteration == 4:
         return
-    current_pos = pyautogui.position()
+    current_pos = data[corner]
     next_corner = corner_helper(corner, direction)
     target = data[next_corner]
 
-    human_move_to(*expand_loc(*current_pos), *target, duration)
+    human_move_inject(*expand_loc(*current_pos), *target, duration)
     return troop_spam_helper(next_corner, direction, iteration + 1, duration)
 
 def find_hero_point():
@@ -121,36 +91,34 @@ def heroes():
     random.shuffle(lst)
     lst.append("z")
     for i in range(5):
-        keyboard.press_and_release(lst[i])
+        click(*data[str(lst[i])], 0.2)
         time.sleep(random.uniform(0.1, 0.2))
         x, y = find_hero_point()
         click(x, y, random.uniform(0.1, 0.2))
     for i in range(4):
-        keyboard.press_and_release(lst[i])
+        click(*data[str(lst[i])], 0.2)
         time.sleep(random.uniform(0.1, 0.2))
     return
 
 def spells():
-    keyboard.press_and_release("a")
+    click(*data['a'], 0.2)
     corners = ["left", "top", "right"]
     random.shuffle(corners)
     for i in range(3):
         x, y = data[corners[i]]
         if corners[i] == "left":
-            x += data["earthquake"] * 1.3
+            x += round(data["earthquake"] * 1.3)
         elif corners[i] == "top":
             y += data["earthquake"]
         else:
-            x -= data["earthquake"] * 1.3
+            x -= round(data["earthquake"] * 1.3)
         for j in range(4):
             click(x, y, 0.1)
 
 def attack(_method, run_time):
     time.sleep(1)
     click(*data["empty"], 0.2)
-    for _ in range(20):
-        pyautogui.scroll(-400)
-        time.sleep(0.2)
+    scroll_inject(1000, 1000, 10)
     time.sleep(random.uniform(0.1, 0.3))
     start_time = time.time()
     while time.time() - start_time < run_time:
