@@ -1,8 +1,6 @@
 import os
 import sys
 import ctypes
-import cv2
-import json
 import time
 import random
 from ctypes import wintypes
@@ -65,10 +63,8 @@ WM_KEYDOWN = 0x0100
 WM_KEYUP   = 0x0101
 WM_CHAR    = 0x0102
 
-def key_injector(keycode):
-    user32.PostMessageW(hwnd, WM_KEYDOWN, keycode, 0)
-    # user32.PostMessageW(hwnd, WM_CHAR, keycode, 0)
-    user32.PostMessageW(hwnd, WM_KEYUP, keycode, 0)
+def move_injector(x, y):
+    user32.SendMessageW(hwnd, WM_MOUSEMOVE, MK_LBUTTON, make_lparam(x, y))
 
 def make_lparam(x, y):
     return (y << 16) | (x & 0xFFFF)
@@ -80,7 +76,7 @@ FindWindow.restype = wintypes.HWND
 hwnd = get_hwnd_partial(name="Clash of Clans")
 
 def click_inject(x, y):
-    lparam = make_lparam(x, y)
+    lparam = make_lparam(int(x), int(y))
     user32.SendMessageW(hwnd, WM_LBUTTONDOWN, MK_LBUTTON, lparam)
     user32.SendMessageW(hwnd, WM_LBUTTONUP,   0,          lparam)
 
@@ -105,6 +101,7 @@ def human_move_inject(x1, y1, x2, y2, duration=400):
         else:
             tim /= 0.995
 
+
 def mouse_downup_inject(state, x, y):
     if state == 1:
         user32.SendMessageW(hwnd, WM_LBUTTONDOWN, MK_LBUTTON, make_lparam(x, y))
@@ -116,7 +113,7 @@ def scroll_inject(x, y, amount):
     wparam = delta << 16  # high word
     for i in range(amount):
         user32.SendMessageW(hwnd, WM_MOUSEWHEEL, wparam, make_lparam(x, y))
-        time.sleep(random.uniform(0.1, 0.3))
+        time.sleep(random.uniform(0.05, 0.2))
 
 class RECT(ctypes.Structure):
     _fields_ = [("left", ctypes.c_long),
@@ -186,19 +183,4 @@ def screenshot_window_hwnd(path="window_pw.png"):
     user32.ReleaseDC(hwnd, hwndDC)
 
     return
-
-def find_icon_inject(template_path, region, threshold=0.85, filename="window_pw.png"):
-    screenshot_window_hwnd()
-    img_path = SCREENS_DIR / filename
-    img = cv2.imread(str(img_path))
-    template = cv2.imread(str(resource_path(template_path)))
-
-    x, y, w, h = region
-    cropped = img[y:y + h, x:x + w]
-    result = cv2.matchTemplate(cropped, template, cv2.TM_CCOEFF_NORMED)
-    _, max_val, _, max_loc = cv2.minMaxLoc(result)
-    if max_val >= threshold:
-        return True
-    return False
-
 
