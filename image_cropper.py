@@ -34,7 +34,7 @@ def crop_screen(x1, y1, x2, y2, output_name="cropped_screen.png"):
 
 def _preprocess(img_bgr, debug=None):
     gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
-    _, th = cv2.threshold(gray, 235, 255, cv2.THRESH_BINARY)
+    _, th = cv2.threshold(gray, 240, 255, cv2.THRESH_BINARY)
 
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2,2))
     th = cv2.dilate(th, kernel, iterations=1)
@@ -230,6 +230,7 @@ def find_icon_img(template_path, region, threshold=0.85, filename="window_pw.png
     # Crop region
     x, y, w, h = region
     cropped = img[y:y + h, x:x + w]
+    # cv2.imwrite("debug_cropped.png", cropped)
 
     # Template match
     result = cv2.matchTemplate(cropped, template, cv2.TM_CCOEFF_NORMED)
@@ -315,3 +316,4 @@ def find_all_icon_img(template_path, region, text=False, threshold=0.85, filenam
 
 # print(detect_brightest(1393, 496, 1456, 530))
 # print(detect_brightest(1405, 422, 1465, 456))
+
