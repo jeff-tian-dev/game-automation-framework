@@ -150,7 +150,6 @@ def walls_helper(g, e):
         points = find_all_icon_img(resource_path(data["path_wall"]), (800, 200, 400, 800), text=True, threshold=0.7)
         points.reverse()
         if points:
-            print("walls found!")
             flag = False
             for j in range(len(points)):
                 tx, ty, _ = points[j]
@@ -163,7 +162,6 @@ def walls_helper(g, e):
                     flag = True
                     walls = (tx, ty)
                     break
-                print("no money :(")
             if flag:
                 break
         x, y = 1290, random.randint(700, 900)
@@ -177,7 +175,7 @@ def walls_helper(g, e):
         mouse_downup_inject(0, 1290, 300)
         time.sleep(0.2)
     if walls:
-        click(*tuple(map(int, walls)), 0.3)
+        click(*tuple(map(int, walls)), 0.6)
         points = find_all_icon_img(resource_path("templates/upgrade.png"), (1000, 1000, 1000, 500), text=False, threshold=0.7)
         points.sort()
         if g > e:
@@ -221,6 +219,7 @@ def attack(_method, run_time, walls):
 
         time.sleep(random.uniform(4, 5))
         while True:
+            click(1400, 2000, 0.5)
             counter = 1
             g, e, _ = home_resources()
             if g or e or _:
@@ -230,7 +229,6 @@ def attack(_method, run_time, walls):
             time.sleep(2)
             counter += 1
 
-        click(1400, 2000, 0.5)
         if walls:
             g, e, _ = home_resources()
             if g > 15000000 or e > 15000000:

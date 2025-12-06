@@ -267,10 +267,10 @@ def find_all_icon_img(template_path, region, text=False, threshold=0.85, filenam
         _, cropped_bin = cv2.threshold(cropped_gray, 200, 255, cv2.THRESH_BINARY)
         _, template_bin = cv2.threshold(template_gray, 200, 255, cv2.THRESH_BINARY)
 
-        cv2.imwrite("debug_cropped_gray.png", cropped_gray)
-        cv2.imwrite("debug_template_gray.png", template_gray)
-        cv2.imwrite("debug_cropped_bin.png", cropped_bin)
-        cv2.imwrite("debug_template_bin.png", template_bin)
+        # cv2.imwrite("debug_cropped_gray.png", cropped_gray)
+        # cv2.imwrite("debug_template_gray.png", template_gray)
+        # cv2.imwrite("debug_cropped_bin.png", cropped_bin)
+        # cv2.imwrite("debug_template_bin.png", template_bin)
 
         # Template match on binarized images
         result = cv2.matchTemplate(cropped_bin, template_bin, cv2.TM_SQDIFF_NORMED)
