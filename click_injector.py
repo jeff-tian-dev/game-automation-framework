@@ -3,6 +3,8 @@ import sys
 import ctypes
 import time
 import random
+import cv2
+import numpy as np
 from ctypes import wintypes
 from PIL import Image
 from pathlib import Path
@@ -121,7 +123,7 @@ class RECT(ctypes.Structure):
                 ("right", ctypes.c_long),
                 ("bottom", ctypes.c_long)]
 
-def screenshot_window_hwnd(path="window_pw.png"):
+def screenshot():
     # get window rect
     rect = RECT()
     user32.GetWindowRect(hwnd, ctypes.byref(rect))
@@ -174,13 +176,16 @@ def screenshot_window_hwnd(path="window_pw.png"):
     img = Image.frombuffer("RGBA", (width, height), bytes(buffer),
                            "raw", "BGRA", 0, 1)
 
-    out_path = os.path.join(SCREENS_DIR, path)
-    img.save(out_path)
+    frame = np.array(img)  # shape (H, W, 4) or (H, W, 3)
+    if frame.shape[2] == 4:
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGBA2BGR)
+    else:
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
     # cleanup
     gdi32.DeleteObject(hbitmap)
     gdi32.DeleteDC(mfcDC)
     user32.ReleaseDC(hwnd, hwndDC)
 
-    return
+    return frame
 

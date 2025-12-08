@@ -18,7 +18,9 @@ from click_injector import (
     click_inject,
     human_move_inject,
     scroll_inject,
-    mouse_downup_inject, move_injector
+    mouse_downup_inject,
+    move_injector,
+    screenshot
 )
 
 bot_process = None
@@ -58,25 +60,33 @@ def corner_helper(current, direction):
 def expand_loc(x, y):
     return x + random.randint(-15, 15), y + random.randint(-15, 15)
 
-def click(x, y, pause=1.0):
-    click_inject(x + random.randint(-20, 20), y + random.randint(-20, 20))
+def click(x, y, pause=1.0, rand=True):
+    if rand:
+        click_inject(x + random.randint(-20, 20), y + random.randint(-20, 20))
+    else:
+        click_inject(x, y)
     time.sleep(random.uniform(pause - (pause*0.2), pause + (pause*0.2)))
 
 def worth():
-    while find_icon_img(data["path_find"], data["find_icon"]) is None:
+    frame = screenshot()
+    while find_icon_img(frame, data["path_find"], region=data["find_icon"]) == (None, None):
         time.sleep(1)
+        frame = screenshot()
 
 def point_on_line(x1, y1, x2, y2, t=0.5):
     x = x1 + (x2 - x1) * t
     y = y1 + (y2 - y1) * t
     return round(x), round(y)
 
-def troop_spam(duration):
+def troop_spam(duration, method):
     time.sleep(random.randint(1, 2))
     corner = ["right", "left"]
     starting_corner = random.choice(corner)
 
-    click(*data['1'], 0.1)
+    frame = screenshot()
+
+    bx, by = find_icon_img(frame, "templates/" + method + ".png")
+    click(bx, by, 0.1)
     time.sleep(0.2)
     try:
         mouse_downup_inject(1, *expand_loc(*data[starting_corner]))
@@ -85,11 +95,12 @@ def troop_spam(duration):
     finally:
         mouse_downup_inject(0, *expand_loc(*data[starting_corner]))
 
-    heroes()
-    spells()
+    heroes(frame)
+    spells(frame)
 
     for i in range(random.randint(25, 30)):
-        if find_icon_img(data["path_star"], data["star_icon"]) is not None:
+        frame = screenshot()
+        if find_icon_img(frame, data["path_star"], data["star_icon"]) != (None, None):
             break
         time.sleep(1)
 
@@ -114,22 +125,29 @@ def find_hero_point():
     hero_point = point_on_line(*c1, *c2, random.uniform(0, 1))
     return hero_point
 
-def heroes():
-    lst = ["q", "w", "e", "r"]
+def heroes(frame):
+    lst = ["queen", "warden", "RC", "king", "prince"]
+    rep = []
     random.shuffle(lst)
-    lst.append("z")
-    for i in range(5):
-        click(*data[str(lst[i])], 0.2)
-        time.sleep(random.uniform(0.1, 0.2))
-        x, y = find_hero_point()
-        click(x, y, random.uniform(0.1, 0.2))
-    for i in range(4):
-        click(*data[str(lst[i])], 0.2)
+    lst.append("loglauncher")
+    for i in range(6):
+        bx, by = find_icon_img(frame, "templates/" + lst[i] + ".png")
+        if not bx and not by:
+            continue
+        if lst[i] != "loglauncher":
+            rep.append((bx, by))
+        hx, hy = find_hero_point()
+
+        click(bx, by, 0.2, rand=False)
+        click(hx, hy, 0.2)
+    for i in range(len(rep)):
+        click(*rep[i], 0.2)
         time.sleep(random.uniform(0.1, 0.2))
     return
 
-def spells():
-    click(*data['a'], 0.2)
+def spells(frame):
+    bx, by = find_icon_img(frame,"templates/earthquake.png")
+    click(bx, by, 0.2)
     corners = ["left", "top", "right"]
     random.shuffle(corners)
     for i in range(3):
@@ -147,17 +165,18 @@ def walls_helper(g, e):
     click(1206, 80, 0.2)
     walls = None
     for i in range(9):
-        points = find_all_icon_img(resource_path("templates/wall.png"), (800, 200, 400, 800), text=True, threshold=0.7)
+        frame = screenshot()
+        points = find_all_icon_img(frame, resource_path("templates/wall.png"), (800, 200, 400, 800), text=True, threshold=0.7)
         points.reverse()
         if points:
             flag = False
             for j in range(len(points)):
                 tx, ty, _ = points[j]
                 if g > e:
-                    ix, iy = find_icon_img(resource_path("templates/gold.png"), (tx + 200, ty - 30, 500, 60), threshold=0.7, screenshot=False)
+                    ix, iy = find_icon_img(frame, resource_path("templates/gold.png"), (tx + 200, ty - 30, 500, 60), threshold=0.7)
                 else:
-                    ix, iy = find_icon_img(resource_path("templates/elixir.png"), (tx + 200, ty - 30, 500, 60), threshold=0.7, screenshot=False)
-                bri = detect_brightest(ix + 15, iy - 20, ix + 100, iy + 10)
+                    ix, iy = find_icon_img(frame, resource_path("templates/elixir.png"), (tx + 200, ty - 30, 500, 60), threshold=0.7)
+                bri = detect_brightest(frame, ix + 15, iy - 20, ix + 100, iy + 10)
                 if bri > 600:
                     flag = True
                     walls = (tx, ty)
@@ -176,7 +195,8 @@ def walls_helper(g, e):
         time.sleep(0.5)
     if walls:
         click(*tuple(map(int, walls)), 1)
-        points = find_all_icon_img(resource_path("templates/upgrade.png"), (1000, 1000, 1000, 500), text=False, threshold=0.7)
+        frame = screenshot()
+        points = find_all_icon_img(frame, resource_path("templates/upgrade.png"), (1000, 1000, 1000, 500), text=False, threshold=0.7)
         points.sort()
         if g > e:
             click(*points[0][:2], 0.2)
@@ -187,10 +207,10 @@ def walls_helper(g, e):
     else:
         return False
 
-def upgrade_walls():
-    gold, elixir, _ = home_resources()
-    while walls_helper(gold, elixir):
-        gold, elixir, _ = home_resources()
+def upgrade_walls(g, e):
+    while walls_helper(g, e):
+        frame = screenshot()
+        g, e, _ = home_resources(frame)
 
 def attack(_method, run_time, walls):
     time.sleep(1)
@@ -206,11 +226,11 @@ def attack(_method, run_time, walls):
         worth()
 
         if _method == 1:
-            troop_spam(550)
+            troop_spam(550, "sneaky")
         elif _method == 2:
-            troop_spam(450)
+            troop_spam(450, "superbarb")
         elif _method == 3:
-            troop_spam(300)
+            troop_spam(300, "valkyrie")
 
         click(*data["end"])
         click(*data["end_confirm"])
@@ -221,7 +241,8 @@ def attack(_method, run_time, walls):
         while True:
             click(1400, 2000, 0.5)
             counter = 1
-            g, e, _ = home_resources()
+            frame = screenshot()
+            g, e, _ = home_resources(frame)
             if g or e or _:
                 break
             if counter > 5:
@@ -230,9 +251,10 @@ def attack(_method, run_time, walls):
             counter += 1
 
         if walls:
-            g, e, _ = home_resources()
+            frame = screenshot()
+            g, e, _ = home_resources(frame)
             if g > 15000000 or e > 15000000:
-                upgrade_walls()
+                upgrade_walls(g, e)
 
 def run_bot(method, run_time, walls):
     load_data()

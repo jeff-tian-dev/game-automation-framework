@@ -1,18 +1,10 @@
 import os
 import sys
-from doctest import debug
-
 import cv2
+import pyautogui
 import numpy as np
-from pathlib import Path
-from click_injector import screenshot_window_hwnd
 
-if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-    # Running as PyInstaller onefile EXE
-    BASE_DIR = Path(sys._MEIPASS)
-else:
-    # Running as plain .py
-    BASE_DIR = Path(__file__).resolve().parent
+from pathlib import Path
 
 def resource_path(relative_path):
     try:
@@ -28,11 +20,10 @@ SCREENS_DIR.mkdir(parents=True, exist_ok=True)
 BLOBS_DIR = APPDATA / "blobs_tmp"
 BLOBS_DIR.mkdir(parents=True, exist_ok=True)
 
-def crop_screen(x1, y1, x2, y2, output_name="cropped_screen.png"):
-    screenshot_window_hwnd()
-    img = cv2.imread(str(SCREENS_DIR / "window_pw.png"))
-    cropped = img[y1:y2, x1:x2]
-    cv2.imwrite(str(SCREENS_DIR / output_name), cropped)
+screenx, screeny = pyautogui.size()
+
+def crop_screen(img, x1, y1, x2, y2):
+    return img[y1:y2, x1:x2]
 
 def _preprocess(img_bgr, debug=None):
     thresh = 215  # tweak this: 210–235 depending on how strong you want it
@@ -95,10 +86,9 @@ THRESH_VAL = 200  # same idea as your _preprocess threshold
 
 def load_templates_binary(template_dir="templates"):
     templates = {}
-    tdir = BASE_DIR / template_dir
 
     for d in range(10):
-        path = tdir / f"{d}.png"
+        path = resource_path(f"templates/{d}.png")
         img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
         if img is None:
             raise FileNotFoundError(f"Template missing: {path}")
@@ -154,23 +144,15 @@ def classify_digit_by_templates(blob_img, templates, min_score=0.7):
         return None, best_score
     return best_digit, best_score
 
-def read_number_with_templates(img_name, templates, debug=False):
+def read_number_with_templates(img, templates, debug=False):
     for f in BLOBS_DIR.glob("*.png"):
         f.unlink(missing_ok=True)
 
-    img_path = SCREENS_DIR / img_name
-    img = cv2.imread(str(img_path))
-    if img is None:
-        raise FileNotFoundError(img_path)
-
     # 1) binarize (your function)
-    bin_img = _preprocess(img, debug=Path(img_path).stem if debug else None)
+    bin_img = _preprocess(img)
 
     # 2) find digit blobs (your function)
     boxes = find_digit_boxes(bin_img, out_dir="blobs_debug" if debug else "blobs_tmp")
-
-    if debug:
-        print(f"[{img_path}] boxes: {boxes}")
 
     # 3) classify each blob
     digits = []
@@ -187,38 +169,35 @@ def read_number_with_templates(img_name, templates, debug=False):
 
     return int("".join(digits))
 
-def read_all_resources(template_dir="templates", debug=False):
+def read_all_resources(img, template_dir="templates", debug=False):
     templates = load_templates_binary(template_dir)
 
-    crop_screen(115, 175, 350, 230, "gold.png")
-    crop_screen(115, 250, 350, 300, "elixir.png")
-    crop_screen(115, 320, 275, 370, "dark_elixir.png")
+    g =  crop_screen(img, 115, 175, 350, 230)
+    e =  crop_screen(img,115, 250, 350, 300)
+    de = crop_screen(img,115, 320, 275, 370)
 
     result = [
-        read_number_with_templates("gold.png",        templates, debug=debug),
-        read_number_with_templates("elixir.png",      templates, debug=debug),
-        read_number_with_templates("dark_elixir.png", templates, debug=debug),
+        read_number_with_templates(g,  templates, debug=debug),
+        read_number_with_templates(e,  templates, debug=debug),
+        read_number_with_templates(de, templates, debug=debug),
     ]
     return result
 
-def home_resources(template_dir="templates", debug=False):
+def home_resources(img, template_dir="templates", debug=False):
     templates = load_templates_binary(template_dir)
 
-    crop_screen(2150, 57, 2420, 101, "home_gold.png")
-    crop_screen(2150, 183, 2420, 227, "home_elixir.png")
-    crop_screen(2240, 303, 2420, 351, "home_dark_elixir.png")
+    g =  crop_screen(img,2150, 57, 2420, 101)
+    e =  crop_screen(img,2150, 183, 2420, 227)
+    de = crop_screen(img,2240, 303, 2420, 351)
 
     result = [
-        read_number_with_templates("home_gold.png", templates, debug=debug),
-        read_number_with_templates("home_elixir.png", templates, debug=debug),
-        read_number_with_templates("home_dark_elixir.png", templates, debug=debug),
+        read_number_with_templates(g,  templates, debug=debug),
+        read_number_with_templates(e,  templates, debug=debug),
+        read_number_with_templates(de, templates, debug=debug),
     ]
     return result
 
-def detect_brightest(x1, y1, x2, y2):
-    img_path = SCREENS_DIR / "window_pw.png"
-    img = cv2.imread(str(img_path))
-
+def detect_brightest(img, x1, y1, x2, y2):
     crop = img[y1:y2, x1:x2]
 
     # Sum BGR values for each pixel → approximate brightness
@@ -228,11 +207,7 @@ def detect_brightest(x1, y1, x2, y2):
 
     return int(max_val)
 
-def find_icon_img(template_path, region, threshold=0.85, filename="window_pw.png", screenshot=True):
-    if screenshot:
-        screenshot_window_hwnd()
-    img_path = SCREENS_DIR / filename
-    img = cv2.imread(str(img_path))
+def find_icon_img(img, template_path, region=(0, 0, screenx, screeny), threshold=0.85):
     template = cv2.imread(str(resource_path(template_path)))
 
     # Crop region
@@ -246,7 +221,7 @@ def find_icon_img(template_path, region, threshold=0.85, filename="window_pw.png
 
     # If match too weak → return None
     if max_val < threshold:
-        return None
+        return None, None
 
     # Convert local coords → global screen coords
     template_h, template_w = template.shape[:2]
@@ -256,11 +231,7 @@ def find_icon_img(template_path, region, threshold=0.85, filename="window_pw.png
     # Return center of detected icon + confidence
     return match_x, match_y
 
-def find_all_icon_img(template_path, region, text=False, threshold=0.85, filename="window_pw.png", screenshot=True):
-    if screenshot:
-        screenshot_window_hwnd()
-    img_path = SCREENS_DIR / filename
-    img = cv2.imread(str(img_path))
+def find_all_icon_img(img, template_path, region=(0, 0, screenx, screeny), text=False, threshold=0.85):
     template = cv2.imread(str(resource_path(template_path)))
 
     # Region crop
