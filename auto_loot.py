@@ -1,5 +1,3 @@
-import sys
-import os
 import pyautogui
 import time
 import random
@@ -11,8 +9,10 @@ from multiprocessing import Process, freeze_support
 
 from image_cropper import (
     find_icon_img,
-    find_all_icon_img, home_resources,
-    detect_brightest
+    find_all_icon_img,
+    home_resources,
+    detect_brightest,
+    resource_path
 )
 from click_injector import (
     click_inject,
@@ -25,20 +25,13 @@ from click_injector import (
 
 bot_process = None
 
-def resource_path(relative_path):
-    try:
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
-    return os.path.join(base_path, relative_path)
-
 CORNER_ORDER = ["left", "top", "right", "bottom"]
 data = {}
 
 def load_data():
     global data
 
-    with open(resource_path("templates/data.json"), "r") as f:
+    with open(resource_path("data.json"), "r") as f:
         temp_data = json.load(f)
 
     width, height = pyautogui.size()
@@ -62,16 +55,38 @@ def expand_loc(x, y):
 
 def click(x, y, pause=1.0, rand=True):
     if rand:
-        click_inject(x + random.randint(-20, 20), y + random.randint(-20, 20))
+        click_inject(x + random.randint(-15, 15), y + random.randint(-15, 15))
     else:
         click_inject(x, y)
     time.sleep(random.uniform(pause - (pause*0.2), pause + (pause*0.2)))
 
-def worth():
-    frame = screenshot()
-    while find_icon_img(frame, data["path_find"], region=data["find_icon"]) == (None, None):
-        time.sleep(1)
-        frame = screenshot()
+def check_screen(template, find_all=False, repeat=15, error=True, frame=None):
+    for i in range(repeat):
+        time.sleep(0.5)
+        if frame is None or i != 0:
+            frame = screenshot()
+        if find_all:
+            bxy = find_all_icon_img(frame, template)
+            if bxy:
+                return bxy
+        else:
+            bx, by = find_icon_img(frame, template)
+            if (bx, by) != (None, None):
+                return bx, by
+    if error:
+        raise RuntimeError(f"Timed out, can't find image {template}.")
+    return None, None
+
+def home_screen_check():
+    for i in range(15):
+        a, b = check_screen("attack.png", repeat=1, error=False)
+        if (a, b) != (None, None):
+            return
+        c, d = check_screen("okay.png", repeat=1, error=False)
+        if (c, d) != (None, None):
+            time.sleep(0.5)
+            click(c, d)
+            return
 
 def point_on_line(x1, y1, x2, y2, t=0.5):
     x = x1 + (x2 - x1) * t
@@ -80,13 +95,11 @@ def point_on_line(x1, y1, x2, y2, t=0.5):
 
 def troop_spam(duration, method):
     time.sleep(random.randint(1, 2))
-    corner = ["right", "left"]
-    starting_corner = random.choice(corner)
+    starting_corner = random.choice(["right", "left"])
 
     frame = screenshot()
 
-    bx, by = find_icon_img(frame, "templates/" + method + ".png")
-    click(bx, by, 0.1)
+    click(*check_screen(f"{method}.png", frame=frame))
     time.sleep(0.2)
     try:
         mouse_downup_inject(1, *expand_loc(*data[starting_corner]))
@@ -97,12 +110,6 @@ def troop_spam(duration, method):
 
     heroes(frame)
     spells(frame)
-
-    for i in range(random.randint(25, 30)):
-        frame = screenshot()
-        if find_icon_img(frame, data["path_star"], data["star_icon"]) != (None, None):
-            break
-        time.sleep(1)
 
 def troop_spam_helper(corner, direction, iteration, duration):
     if iteration == 4:
@@ -131,7 +138,7 @@ def heroes(frame):
     random.shuffle(lst)
     lst.append("loglauncher")
     for i in range(6):
-        bx, by = find_icon_img(frame, "templates/" + lst[i] + ".png")
+        bx, by = find_icon_img(frame, f"{lst[i]}.png", threshold=0.7)
         if not bx and not by:
             continue
         if lst[i] != "loglauncher":
@@ -146,7 +153,7 @@ def heroes(frame):
     return
 
 def spells(frame):
-    bx, by = find_icon_img(frame,"templates/earthquake.png")
+    bx, by = find_icon_img(frame,"earthquake.png")
     click(bx, by, 0.2)
     corners = ["left", "top", "right"]
     random.shuffle(corners)
@@ -161,21 +168,33 @@ def spells(frame):
         for j in range(4):
             click(x, y, 0.1)
 
+def walls_scroll():
+    x, y = 1290, random.randint(700, 900)
+    cy = y
+    mouse_downup_inject(1, x, y)
+    for j in range(50):
+        move_injector(1290, round(cy))
+        cy += (300 - y) / 50.0
+        time.sleep(0.01)
+    time.sleep(0.1)
+    mouse_downup_inject(0, 1290, 300)
+    time.sleep(0.5)
+
 def walls_helper(g, e):
     click(1206, 80, 0.2)
     walls = None
     for i in range(9):
         frame = screenshot()
-        points = find_all_icon_img(frame, resource_path("templates/wall.png"), (800, 200, 400, 800), text=True, threshold=0.7)
+        points = find_all_icon_img(frame, "wall.png", (800, 200, 400, 800), text=True, threshold=0.7)
         points.reverse()
         if points:
             flag = False
             for j in range(len(points)):
-                tx, ty, _ = points[j]
+                tx, ty = points[j]
                 if g > e:
-                    ix, iy = find_icon_img(frame, resource_path("templates/gold.png"), (tx + 200, ty - 30, 500, 60), threshold=0.7)
+                    ix, iy = find_icon_img(frame, "gold.png", (tx + 200, ty - 30, 500, 60), threshold=0.7)
                 else:
-                    ix, iy = find_icon_img(frame, resource_path("templates/elixir.png"), (tx + 200, ty - 30, 500, 60), threshold=0.7)
+                    ix, iy = find_icon_img(frame, "elixir.png", (tx + 200, ty - 30, 500, 60), threshold=0.7)
                 bri = detect_brightest(frame, ix + 15, iy - 20, ix + 100, iy + 10)
                 if bri > 600:
                     flag = True
@@ -183,34 +202,36 @@ def walls_helper(g, e):
                     break
             if flag:
                 break
-        x, y = 1290, random.randint(700, 900)
-        cy = y
-        mouse_downup_inject(1, x, y)
-        for j in range(50):
-            move_injector(1290, round(cy))
-            cy += (300 - y) / 50.0
-            time.sleep(0.01)
-        time.sleep(0.1)
-        mouse_downup_inject(0, 1290, 300)
-        time.sleep(0.5)
+        walls_scroll()
+
     if walls:
         click(*tuple(map(int, walls)), 1)
-        frame = screenshot()
-        points = find_all_icon_img(frame, resource_path("templates/upgrade.png"), (1000, 1000, 1000, 500), text=False, threshold=0.7)
-        points.sort()
+        points = sorted(check_screen("upgrade.png", find_all=True))
         if g > e:
-            click(*points[0][:2], 0.2)
+            click(*points[0], 0.5)
         else:
-            click(*points[1][:2], 0.2)
-        click(1838, 1406, 2)
+            click(*points[1], 0.5)
+        click(*check_screen("confirm.png"), 2)
         return True
     else:
         return False
 
-def upgrade_walls(g, e):
-    while walls_helper(g, e):
+def upgrade_walls(walls):
+    if walls:
         frame = screenshot()
         g, e, _ = home_resources(frame)
+        if g > 15000000 or e > 15000000:
+            while walls_helper(g, e):
+                frame = screenshot()
+                g, e, _ = home_resources(frame)
+
+def attack_type(_method):
+    if _method == 1:
+        troop_spam(550, "sneaky")
+    elif _method == 2:
+        troop_spam(450, "superbarb")
+    elif _method == 3:
+        troop_spam(300, "valkyrie")
 
 def attack(_method, run_time, walls):
     time.sleep(1)
@@ -220,41 +241,23 @@ def attack(_method, run_time, walls):
     start_time = time.time()
 
     while time.time() - start_time < run_time:
-        click(*data["attack"])
-        click(*data["find_match"])
-        click(*data["attack2"])
-        worth()
+        click(*check_screen("attack.png"), 0.1)
+        click(*check_screen("findmatch.png"), 0.1)
+        click(*check_screen("attack2.png"), 0.1)
+        check_screen("find.png")
 
-        if _method == 1:
-            troop_spam(550, "sneaky")
-        elif _method == 2:
-            troop_spam(450, "superbarb")
-        elif _method == 3:
-            troop_spam(300, "valkyrie")
+        attack_type(_method)
 
-        click(*data["end"])
-        click(*data["end_confirm"])
-        for i in range(random.randint(1, 4)):
-            click(*data["return"], 0.1)
+        bx, by = check_screen("endbattle.png", repeat=40, error=False)
+        if (bx, by) == (None, None):
+            click(*check_screen("surrender.png"), 0.1)
+        else:
+            click(bx, by, 0.1)
 
-        time.sleep(random.uniform(4, 5))
-        while True:
-            click(1400, 2000, 0.5)
-            counter = 1
-            frame = screenshot()
-            g, e, _ = home_resources(frame)
-            if g or e or _:
-                break
-            if counter > 5:
-                raise FileNotFoundError
-            time.sleep(2)
-            counter += 1
-
-        if walls:
-            frame = screenshot()
-            g, e, _ = home_resources(frame)
-            if g > 15000000 or e > 15000000:
-                upgrade_walls(g, e)
+        click(*check_screen("okay.png"), 0.1)
+        click(*check_screen("returnhome.png"), 0.1)
+        home_screen_check()
+        upgrade_walls(walls)
 
 def run_bot(method, run_time, walls):
     load_data()

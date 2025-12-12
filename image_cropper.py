@@ -6,12 +6,13 @@ import numpy as np
 
 from pathlib import Path
 
-def resource_path(relative_path):
+def resource_path(relative_path) -> str:
     try:
         base_path = sys._MEIPASS
     except Exception:
         base_path = os.path.abspath(".")
-    return os.path.join(base_path, relative_path)
+
+    return str(os.path.join(base_path, "templates", relative_path))
 
 APPDATA = Path(os.getenv("APPDATA")) / "AutoLootBot"
 SCREENS_DIR = APPDATA / "screens"
@@ -88,7 +89,7 @@ def load_templates_binary(template_dir="templates"):
     templates = {}
 
     for d in range(10):
-        path = resource_path(f"templates/{d}.png")
+        path = resource_path(f"{d}.png")
         img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
         if img is None:
             raise FileNotFoundError(f"Template missing: {path}")
@@ -207,8 +208,8 @@ def detect_brightest(img, x1, y1, x2, y2):
 
     return int(max_val)
 
-def find_icon_img(img, template_path, region=(0, 0, screenx, screeny), threshold=0.85):
-    template = cv2.imread(str(resource_path(template_path)))
+def find_icon_img(img, template_path, region=(0, 0, int(screenx), int(screeny)), threshold=0.8):
+    template = cv2.imread(resource_path(template_path))
 
     # Crop region
     x, y, w, h = region
@@ -232,7 +233,7 @@ def find_icon_img(img, template_path, region=(0, 0, screenx, screeny), threshold
     return match_x, match_y
 
 def find_all_icon_img(img, template_path, region=(0, 0, screenx, screeny), text=False, threshold=0.85):
-    template = cv2.imread(str(resource_path(template_path)))
+    template = cv2.imread(resource_path(template_path))
 
     # Region crop
     x, y, w, h = region
@@ -275,7 +276,7 @@ def find_all_icon_img(img, template_path, region=(0, 0, screenx, screeny), text=
         if text:
             conf = 1.0 - conf
 
-        points.append((screen_x, screen_y, conf))
+        points.append((screen_x, screen_y))
 
     filtered = []
     radius = min(tw, th) // 2  # distance threshold
@@ -295,4 +296,5 @@ def find_all_icon_img(img, template_path, region=(0, 0, screenx, screeny), text=
 
 # print(detect_brightest(1393, 496, 1456, 530))
 # print(detect_brightest(1405, 422, 1465, 456))
+
 
