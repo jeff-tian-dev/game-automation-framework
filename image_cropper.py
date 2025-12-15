@@ -1,22 +1,21 @@
 import os
 import sys
+import time
 import cv2
 import pyautogui
 import numpy as np
 
+from click_injector import screenshot
 from pathlib import Path
 
-def resource_path(relative_path) -> str:
+def resource_path(relative_path):
     try:
         base_path = sys._MEIPASS
     except Exception:
         base_path = os.path.abspath(".")
-
-    return str(os.path.join(base_path, "templates", relative_path))
+    return str(os.path.join(base_path, "templates/" + relative_path))
 
 APPDATA = Path(os.getenv("APPDATA")) / "AutoLootBot"
-SCREENS_DIR = APPDATA / "screens"
-SCREENS_DIR.mkdir(parents=True, exist_ok=True)
 
 BLOBS_DIR = APPDATA / "blobs_tmp"
 BLOBS_DIR.mkdir(parents=True, exist_ok=True)
@@ -62,7 +61,7 @@ def find_digit_boxes(bin_img, out_dir="blobs"):
         x, y, w, h, area = stats[i]
 
         # filter small noise
-        if w < 3 or h < 3:
+        if w < 9 or h < 18:
             continue
 
         # filter huge accidental blobs
@@ -74,14 +73,11 @@ def find_digit_boxes(bin_img, out_dir="blobs"):
     # Sort boxes left → right
     boxes.sort(key=lambda b: b[0])
 
-    # Extract and save each blob
-    for idx, (x, y, w, h) in enumerate(boxes):
-        roi = bin_img[y:y + h, x:x + w]
+    blobs = []
+    for (x, y, w, h) in boxes:
+        blobs.append(bin_img[y:y + h, x:x + w])
 
-        filename = os.path.join(out_dir, f"digit_{idx}.png")
-        cv2.imwrite(filename, roi)
-
-    return boxes
+    return blobs, boxes
 
 THRESH_VAL = 200  # same idea as your _preprocess threshold
 
@@ -146,29 +142,19 @@ def classify_digit_by_templates(blob_img, templates, min_score=0.7):
     return best_digit, best_score
 
 def read_number_with_templates(img, templates, debug=False):
-    for f in BLOBS_DIR.glob("*.png"):
-        f.unlink(missing_ok=True)
-
-    # 1) binarize (your function)
     bin_img = _preprocess(img)
 
-    # 2) find digit blobs (your function)
-    boxes = find_digit_boxes(bin_img, out_dir="blobs_debug" if debug else "blobs_tmp")
+    blobs, boxes = find_digit_boxes(bin_img)
 
-    # 3) classify each blob
     digits = []
-    for (x, y, w, h) in boxes:
-        blob = bin_img[y:y+h, x:x+w]
+    for blob, box in zip(blobs, boxes):
         d, score = classify_digit_by_templates(blob, templates)
         if debug:
-            print(f"  box {(x, y, w, h)} -> {d} (score={score:.3f})")
+            print(f"  box {box} -> {d} (score={score:.3f})")
         if d is not None:
             digits.append(str(d))
 
-    if not digits:
-        return None
-
-    return int("".join(digits))
+    return int("".join(digits)) if digits else None
 
 def read_all_resources(img, template_dir="templates", debug=False):
     templates = load_templates_binary(template_dir)
@@ -292,9 +278,9 @@ def find_all_icon_img(img, template_path, region=(0, 0, screenx, screeny), text=
 # print(find_all_icon_img(resource_path("templates/testing.png"), (1000, 1000, 1000, 500), text=False, threshold=0.85))
 
 # print(detect_by_saturation(1523, 792, 1628, 813))
-# print(home_resources())
 
 # print(detect_brightest(1393, 496, 1456, 530))
 # print(detect_brightest(1405, 422, 1465, 456))
 
+print(home_resources(screenshot()))
 

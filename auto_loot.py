@@ -78,14 +78,16 @@ def check_screen(template, find_all=False, repeat=15, error=True, frame=None):
     return None, None
 
 def home_screen_check():
+    flag = False
     for i in range(15):
         a, b = check_screen("attack.png", repeat=1, error=False)
         if (a, b) != (None, None):
-            return
-        c, d = check_screen("okay.png", repeat=1, error=False)
+            flag = True
+        c, d = check_screen("okay.png", repeat=3, error=False)
         if (c, d) != (None, None):
             time.sleep(0.5)
             click(c, d)
+        if flag:
             return
 
 def point_on_line(x1, y1, x2, y2, t=0.5):
@@ -205,7 +207,7 @@ def walls_helper(g, e):
         walls_scroll()
 
     if walls:
-        click(*tuple(map(int, walls)), 1)
+        click(*tuple(map(int, walls)), 0.5)
         points = sorted(check_screen("upgrade.png", find_all=True))
         if g > e:
             click(*points[0], 0.5)
@@ -220,10 +222,13 @@ def upgrade_walls(walls):
     if walls:
         frame = screenshot()
         g, e, _ = home_resources(frame)
+        print(g, e)
         if g > 15000000 or e > 15000000:
             while walls_helper(g, e):
                 frame = screenshot()
                 g, e, _ = home_resources(frame)
+
+
 
 def attack_type(_method):
     if _method == 1:

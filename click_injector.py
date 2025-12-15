@@ -15,13 +15,6 @@ except Exception:
     # fallback for older Windows
     ctypes.windll.user32.SetProcessDPIAware()
 
-def resource_path(relative_path):
-    try:
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
-    return os.path.join(base_path, relative_path)
-
 APPDATA = Path(os.getenv("APPDATA")) / "AutoLootBot"
 SCREENS_DIR = APPDATA / "screens"
 SCREENS_DIR.mkdir(parents=True, exist_ok=True)
