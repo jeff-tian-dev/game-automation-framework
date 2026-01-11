@@ -212,8 +212,8 @@ def walls_helper():
 
     if walls:
         click(*tuple(map(int, walls)), 0.5)
-        points = sorted(check_screen("upgrade.png", find_all=True, required=2, thresh=0.7))
         click(*check_screen("upgrademore.png"), 0.5)
+        points = sorted(check_screen("upgradedouble.png", find_all=True, required=2, thresh=0.7))
         for i in range(15):
             frame = screenshot()
             gx, gy = points[0]
@@ -225,7 +225,8 @@ def walls_helper():
             ix, iy = find_icon_img(frame, "addwall.png", threshold=0.9)
             if (ix, iy) == (None, None):
                 break
-            click(ix, iy, 0.1)
+            click(ix, iy, 0.2)
+        time.sleep(0.3)
         click(*check_screen("removewall.png"), 0.3)
         click(*points[ind], 0.5)
         click(*check_screen("okay.png"), 2)
