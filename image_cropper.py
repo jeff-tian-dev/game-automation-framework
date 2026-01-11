@@ -96,24 +96,36 @@ def find_all_icon_img(img, template_path, region=(0, 0, screenx, screeny), text=
     return filtered
 
 
-def exact_color_fraction(img, target_bgr=(112, 119, 224), tolerance=3, save=False):
+def exact_color_fraction(img, target_hsv, tolerance=5, save=False):
     if img is None:
         raise ValueError("Could not load image")
 
-    # Convert target to int16 to prevent overflow/underflow (e.g. 0 - 10 wrapping to 246)
-    target = np.array(target_bgr, dtype=np.int16)
+        # Convert the image to HSV
+    hsv_img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
-    lower = np.clip(target - tolerance, 0, 255).astype(np.uint8)
-    upper = np.clip(target + tolerance, 0, 255).astype(np.uint8)
+    # 1. Extract just the Hue (H) from the target tuple
+    target_hue = target_hsv[0]
 
-    # Returns a mask where 255 is a match and 0 is not
-    mask = cv2.inRange(img, lower, upper)
+    # 2. Define the range
+    # Hue: target +/- tolerance (clipped to 0-179)
+    # Saturation & Value: Hardcoded to 100-255 (ignores gamma/lighting shifts)
+    h_min = max(0, target_hue - tolerance)
+    h_max = min(179, target_hue + tolerance)
+
+    lower = np.array([h_min, 100, 100], dtype=np.uint8)
+    upper = np.array([h_max, 255, 255], dtype=np.uint8)
+
+    # 3. Create Mask
+    mask = cv2.inRange(hsv_img, lower, upper)
 
     if save:
         debug_img = img.copy()
-        # Apply highlight where mask is white (255)
+        # Highlight matched pixels with Neon Magenta
         debug_img[mask > 0] = (255, 0, 255)
-        if target_bgr == (11, 169, 203):
+
+        # Check Hue to guess if it is Gold (Yellow/Orange) or Elixir (Purple)
+        # Gold/Orange is usually Hue 15-30. Purple is 140-160.
+        if target_hue < 50:
             cv2.imwrite("golddd.png", debug_img)
         else:
             cv2.imwrite("elixirrr.png", debug_img)
@@ -126,26 +138,36 @@ def exact_color_fraction(img, target_bgr=(112, 119, 224), tolerance=3, save=Fals
 
     return matched_pixels / total_pixels
 
-def find_leftmost_pixel(img, target_bgr=(112, 119, 224), tolerance=3):
+def find_leftmost_pixel(img, target_hsv, tolerance=5, save=False):
     if img is None:
         return None
+    hsv_img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
-    target = np.array(target_bgr, dtype=np.int16)
-    lower = np.clip(target - tolerance, 0, 255).astype(np.uint8)
-    upper = np.clip(target + tolerance, 0, 255).astype(np.uint8)
+    target_hue = target_hsv[0]
 
-    mask = cv2.inRange(img, lower, upper)
+    h_min = max(0, target_hue - tolerance)
+    h_max = min(179, target_hue + tolerance)
 
-    # Get all matching coordinates (rows=y, cols=x)
+    lower = np.array([h_min, 100, 100], dtype=np.uint8)
+    upper = np.array([h_max, 255, 255], dtype=np.uint8)
+
+    mask = cv2.inRange(hsv_img, lower, upper)
+
     ys, xs = np.nonzero(mask)
+
+    if save:
+        debug_img = img.copy()
+        # Apply highlight where mask is white (255)
+        debug_img[mask > 0] = (255, 0, 255)
+        if target_hsv == (24, 241, 203):
+            cv2.imwrite("golddd.png", debug_img)
+        else:
+            cv2.imwrite("elixirrr.png", debug_img)
 
     if len(xs) == 0:
         return None, None
 
-    # Find the index of the smallest x value
     min_idx = np.argmin(xs)
-
-    # Return (x, y)
     return int(xs[min_idx]), int(ys[min_idx])
 
 
@@ -164,3 +186,7 @@ def find_leftmost_pixel(img, target_bgr=(112, 119, 224), tolerance=3):
 # print(exact_color_fraction(frame[95:105, 2060:2420], target_bgr=(11, 169, 203), tolerance=0))
 # print(exact_color_fraction(frame[220:230, 2060:2420], target_bgr=(169, 34, 169), tolerance=0))
 
+# frame = screenshot()
+# print(find_leftmost_pixel(frame[95:105, 2060:2420], target_hsv=(24, 241, 203), tolerance=5, save=True))
+# print(find_leftmost_pixel(frame[220:230, 2060:2420], target_hsv=(149, 203, 169), tolerance=5, save=True))
+#

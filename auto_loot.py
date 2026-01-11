@@ -198,10 +198,10 @@ def walls_helper():
                 ix1, iy1 = find_icon_img(frame, "gold.png", (tx + 200, ty - 30, 500, 60), threshold=0.7)
                 ix2, iy2 = find_icon_img(frame, "elixir.png", (tx + 200, ty - 30, 500, 60), threshold=0.7)
                 if ix1:
-                    bri = exact_color_fraction(frame[iy1 - 20:iy1 + 10, ix1 + 15:ix1 + 100], target_bgr=(112, 119, 224))
+                    bri = exact_color_fraction(frame[iy1 - 20:iy1 + 10, ix1 + 15:ix1 + 100], target_hsv=(1, 127, 224))
                 else:
                     ind = 1
-                    bri = exact_color_fraction(frame[iy2 - 20:iy2 + 10, ix2 + 15:ix2 + 100], target_bgr=(112, 119, 224))
+                    bri = exact_color_fraction(frame[iy2 - 20:iy2 + 10, ix2 + 15:ix2 + 100], target_hsv=(1, 127, 224))
                 if bri < 0.01:
                     flag = True
                     walls = (tx, ty)
@@ -218,8 +218,8 @@ def walls_helper():
             frame = screenshot()
             gx, gy = points[0]
             ex, ey = points[1]
-            bri_gold = exact_color_fraction(frame[gy - 100:gy - 70, gx - 75:gx + 75], target_bgr=(112, 119, 224))
-            bri_elix = exact_color_fraction(frame[ey - 100:ey - 70, ex - 75:ex + 75], target_bgr=(112, 119, 224))
+            bri_gold = exact_color_fraction(frame[gy - 100:gy - 70, gx - 75:gx + 75], target_hsv=(1, 127, 224))
+            bri_elix = exact_color_fraction(frame[ey - 100:ey - 70, ex - 75:ex + 75], target_hsv=(1, 127, 224))
             if bri_gold > 0.01 and bri_elix > 0.01:
                 break
             ix, iy = find_icon_img(frame, "addwall.png", threshold=0.9)
@@ -237,8 +237,8 @@ def walls_helper():
 def upgrade_walls(walls):
     if walls:
         frame = screenshot()
-        g = find_leftmost_pixel(frame[95:105, 2060:2420], target_bgr=(11, 169, 203), tolerance=0)[0]
-        e = find_leftmost_pixel(frame[170:235, 2060:2530], target_bgr=(169, 34, 169), tolerance=0)[0]
+        g = find_leftmost_pixel(frame[95:105, 2060:2420], target_hsv=(24, 241, 203), tolerance=5)[0]
+        e = find_leftmost_pixel(frame[220:230, 2060:2420], target_hsv=(149, 203, 169), tolerance=5)[0]
         if g and e and (g < 120 or e < 120):
             for i in range(2):
                 walls_helper()
