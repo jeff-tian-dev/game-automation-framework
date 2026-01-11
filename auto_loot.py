@@ -222,7 +222,7 @@ def walls_helper():
             bri_elix = exact_color_fraction(frame[ey - 100:ey - 70, ex - 75:ex + 75], target_bgr=(112, 119, 224))
             if bri_gold > 0.01 and bri_elix > 0.01:
                 break
-            ix, iy = check_screen("addwall.png", error=False, thresh=0.9, repeat=1)
+            ix, iy = find_icon_img(frame, "addwall.png", threshold=0.9)
             if (ix, iy) == (None, None):
                 break
             click(ix, iy, 0.1)
