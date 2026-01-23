@@ -29,6 +29,14 @@ GetWindowText = user32.GetWindowTextW
 GetWindowTextLength = user32.GetWindowTextLengthW
 IsWindowVisible = user32.IsWindowVisible
 
+EnumChildWindows = user32.EnumChildWindows
+EnumChildWindows.argtypes = [
+    wintypes.HWND,
+    EnumWindowsProc,
+    wintypes.LPARAM,
+]
+EnumChildWindows.restype = wintypes.BOOL
+
 WM_LBUTTONDOWN = 0x0201
 WM_LBUTTONUP   = 0x0202
 WM_MOUSEMOVE   = 0x0200
@@ -39,9 +47,37 @@ WM_KEYDOWN = 0x0100
 WM_KEYUP   = 0x0101
 WM_CHAR    = 0x0102
 
-def get_hwnd_partial(name="Clash of Clans") -> int:
+def get_hwnd_partial(name="Clash of Clans", child_class="CROSVM_1") -> int:
+    """
+    Returns the child HWND (e.g. CROSVM_1) under the top-level window whose title
+    contains `name`. Falls back to the top-level HWND if the child isn't found.
+    """
     result = {"hwnd": 0}
-    def callback(hwnd, lParam):
+
+    # --- helpers ---
+    def get_class(hwnd) -> str:
+        buf = ctypes.create_unicode_buffer(256)
+        user32.GetClassNameW(hwnd, buf, 256)
+        return buf.value
+
+    def find_descendant_by_class(root_hwnd, target_class) -> int:
+        found = {"hwnd": 0}
+
+        def enum_child_cb(child_hwnd, lParam):
+            # check this child
+            if get_class(child_hwnd) == target_class:
+                found["hwnd"] = child_hwnd
+                return False  # stop enumeration
+
+            # recurse into grandchildren
+            EnumChildWindows(child_hwnd, EnumWindowsProc(enum_child_cb), 0)
+            return True
+
+        EnumChildWindows(root_hwnd, EnumWindowsProc(enum_child_cb), 0)
+        return found["hwnd"]
+
+    # --- find the top-level window by title, then return the desired child ---
+    def enum_top_cb(hwnd, lParam):
         if IsWindowVisible(hwnd):
             length = GetWindowTextLength(hwnd)
             if length > 0:
@@ -50,12 +86,14 @@ def get_hwnd_partial(name="Clash of Clans") -> int:
                 title = buff.value
 
                 if name.lower() in title.lower():
-                    result["hwnd"] = hwnd
+                    # found top-level; now find child render window
+                    child = find_descendant_by_class(hwnd, child_class)
+                    result["hwnd"] = child if child else hwnd
                     return False  # stop enumeration
 
-        return True  # keep going
+        return True
 
-    EnumWindows(EnumWindowsProc(callback), 0)
+    EnumWindows(EnumWindowsProc(enum_top_cb), 0)
     return result["hwnd"]
 
 FindWindow = user32.FindWindowW
@@ -63,6 +101,7 @@ FindWindow.argtypes = (wintypes.LPCWSTR, wintypes.LPCWSTR)
 FindWindow.restype = wintypes.HWND
 
 hwnd = get_hwnd_partial(name="Clash of Clans")
+
 
 def move_injector(x, y):
     user32.SendMessageW(hwnd, WM_MOUSEMOVE, MK_LBUTTON, make_lparam(x, y))
@@ -182,3 +221,148 @@ def screenshot():
 
     return frame
 
+#
+#
+#
+# GetClassNameW = user32.GetClassNameW
+# GetClassNameW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+# GetClassNameW.restype = ctypes.c_int
+#
+# GetClientRect = user32.GetClientRect
+# GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+# GetClientRect.restype = wintypes.BOOL
+#
+# GetWindowRect = user32.GetWindowRect
+# GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+# GetWindowRect.restype = wintypes.BOOL
+#
+# IsWindowVisible = user32.IsWindowVisible
+# IsWindowVisible.argtypes = [wintypes.HWND]
+# IsWindowVisible.restype = wintypes.BOOL
+#
+# IsWindowEnabled = user32.IsWindowEnabled
+# IsWindowEnabled.argtypes = [wintypes.HWND]
+# IsWindowEnabled.restype = wintypes.BOOL
+# user32 = ctypes.windll.user32
+#
+# # constants
+# GWL_STYLE   = -16
+# GWL_EXSTYLE = -20
+#
+# # pick the right function for pointer size
+# if ctypes.sizeof(ctypes.c_void_p) == 8:
+#     GetWindowLongPtr = user32.GetWindowLongPtrW
+#     GetWindowLongPtr.argtypes = [wintypes.HWND, ctypes.c_int]
+#     GetWindowLongPtr.restype = ctypes.c_longlong
+# else:
+#     GetWindowLongPtr = user32.GetWindowLongW
+#     GetWindowLongPtr.argtypes = [wintypes.HWND, ctypes.c_int]
+#     GetWindowLongPtr.restype = ctypes.c_long
+#
+#
+# def build_hwnd_tree(root_hwnd):
+#     """
+#     Returns a recursive tree of all HWNDs under root_hwnd.
+#
+#     {
+#         "hwnd": int,
+#         "children": [ ... ]
+#     }
+#     """
+#
+#     def build_node(hwndd):
+#         node = {
+#             "hwnd": hwndd,
+#             "children": []
+#         }
+#
+#         def enum_child_callback(child_hwnd, lParam):
+#             node["children"].append(build_node(child_hwnd))
+#             return True
+#
+#         EnumChildWindows(hwndd, EnumWindowsProc(enum_child_callback), 0)
+#         return node
+#
+#     return build_node(root_hwnd)
+#
+# def dump_hwnd_tree(tree):
+#     from ctypes import wintypes
+#
+#     GetClassNameW = user32.GetClassNameW
+#     GetClassNameW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+#
+#     GetWindowRect = user32.GetWindowRect
+#     GetClientRect = user32.GetClientRect
+#
+#     GetWindowThreadProcessId = user32.GetWindowThreadProcessId
+#
+#     def walk(node, depth=0, parent=None):
+#         hwnd = node["hwnd"]
+#
+#         # title
+#         title = ""
+#         length = GetWindowTextLength(hwnd)
+#         if length > 0:
+#             buf = ctypes.create_unicode_buffer(length + 1)
+#             GetWindowText(hwnd, buf, length + 1)
+#             title = buf.value
+#
+#         # class
+#         cls_buf = ctypes.create_unicode_buffer(256)
+#         GetClassNameW(hwnd, cls_buf, 256)
+#         cls = cls_buf.value
+#
+#         # rects
+#         wr = wintypes.RECT()
+#         cr = wintypes.RECT()
+#         GetWindowRect(hwnd, ctypes.byref(wr))
+#         GetClientRect(hwnd, ctypes.byref(cr))
+#
+#         cw = cr.right - cr.left
+#         ch = cr.bottom - cr.top
+#
+#         # styles
+#         style = GetWindowLongPtr(hwnd, GWL_STYLE)
+#         exstyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE)
+#
+#         # proc / thread
+#         pid = wintypes.DWORD()
+#         tid = GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+#
+#         indent = "  " * depth
+#         print(f"""{indent}HWND: {hex(hwnd)}
+# {indent}  parent: {hex(parent) if parent else None}
+# {indent}  class: {cls}
+# {indent}  title: {title}
+# {indent}  visible: {bool(IsWindowVisible(hwnd))}  enabled: {bool(IsWindowEnabled(hwnd))}
+# {indent}  window_rect: ({wr.left},{wr.top},{wr.right},{wr.bottom})
+# {indent}  client_size: {cw}x{ch}
+# {indent}  style: 0x{style:08X}  exstyle: 0x{exstyle:08X}
+# {indent}  pid: {pid.value}  tid: {tid}
+# """)
+#
+#         for c in node["children"]:
+#             walk(c, depth + 1, hwnd)
+#
+#     walk(tree)
+#
+# root = get_hwnd_partial("Clash of Clans")
+# tree = build_hwnd_tree(root)
+#
+# dump_hwnd_tree(tree)
+#
+# class POINT(ctypes.Structure):
+#     _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
+#
+# WindowFromPoint = user32.WindowFromPoint
+# WindowFromPoint.argtypes = [POINT]
+# WindowFromPoint.restype = wintypes.HWND
+#
+# def hwnd_under_cursor(delay=2.0):
+#     time.sleep(delay)  # give you time to move the mouse
+#     pt = POINT()
+#     user32.GetCursorPos(ctypes.byref(pt))
+#     return WindowFromPoint(pt), (pt.x, pt.y)
+#
+# hw, (x, y) = hwnd_under_cursor()
+# print("under cursor:", hex(hw), "at", x, y)
