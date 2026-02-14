@@ -36,6 +36,6 @@ Download the executable from the **Releases** section. Use the `.exe` file only.
 
 ⚠️ Educational Use Only
 
-This project is for learning and experimentation. Using bots may violate Clash of Clans’ Terms of Service.
+This project is for learning and experimentation. Using bots may violate Terms of Service for many games.
 
 I am not responsible for bans or other consequences.
