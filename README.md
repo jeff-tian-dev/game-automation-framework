@@ -9,7 +9,7 @@ Key features:
  - Randomized input scheduling within bounded ranges to simulate non-deterministic execution
  - Windows API integration (ctypes) for window targeting and foreground control
  - Structured repository layout with asset management and reproducible builds via PyInstaller
- - 
+
 The system operates entirely at the client level and does not modify application files or interact with external servers.
 
 ## How to Use
