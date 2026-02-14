@@ -1,11 +1,16 @@
-# Clash of Clans Autoloot
-Automate your looting in Clash of Clans!
+# Real-Time Game UI Automation Engine
 
-AutoLoot is designed to optimize league bonus farming by automating rapid, low-commitment attacks.
-The system focuses on deploying predefined troop patterns to quickly secure a single star, then exiting the battle immediately to maximize bonus efficiency per unit time.
-To reduce repetition and improve robustness, attack patterns and deployment timing are randomized within controlled bounds, introducing natural variation between runs.
+A computer vision–based automation framework built to explore real-time UI interaction in dynamic environments.
+Originally developed as an automation tool for a strategy game, the project evolved into a modular system for detecting on-screen elements and executing context-aware actions based on state transitions.
 
-This project does not interact with game servers directly and does not modify game files. 
+Key features:
+ - OpenCV-based template matching for real-time UI detection
+ - Event-driven state machine controlling decision logic
+ - Randomized input scheduling within bounded ranges to simulate non-deterministic execution
+ - Windows API integration (ctypes) for window targeting and foreground control
+ - Structured repository layout with asset management and reproducible builds via PyInstaller
+ - 
+The system operates entirely at the client level and does not modify application files or interact with external servers.
 
 ## How to Use
 
